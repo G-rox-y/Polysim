@@ -42,7 +42,7 @@ void update_nodes_data (){
         if (nodesData[i].y < 0 || nodesData[i].y > H) nodesData[i].angle *= -1;
     }
 
-    
+
 
     return;
 }
