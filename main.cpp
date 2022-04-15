@@ -20,7 +20,7 @@ std::vector<std::pair<int, int> > linesData;
 //check if the line defined by 2 argument points interceprs with any other lines
 bool intercepts_with_lines(int loc1, int loc2) {
     using namespace std;
-    const float WW = 0.1f; // precision
+    const float WW = 0.001f; // precision
 
     //shortening the names just so its easier to work with
     float x1 = nodesData[loc1].x;
@@ -43,18 +43,24 @@ bool intercepts_with_lines(int loc1, int loc2) {
         //y = ax + b
         //L - Location line, T - Target line
         float aL = (y2-y1) / (x2-x1);
-        float bL = (isinf(aL)) ? x1 : y1 - aL*x1;
+        float bL = y1 - aL*x1;
         float aT = (y4-y3) / (x4-x3);
-        float bT = (isinf(aT)) ? x3 : y3 - aT*x3;
+        float bT = y3 - aT*x3;
 
-        float x = (bT-bL) / (aL-aT);
-        float yT = (isinf(aT)) ? bT : aT*x+bT;
-        float yL = (isinf(aL)) ? bL : aL*x+bT;
+        
+        if (abs(x1-x2) < WW){
+            float y = aT*x1+bT;
+            if (y > min(y3, y4) && y < max(y3, y4)) return true;
+        }
+        if (abs(x3-x4) < WW){
+            float y = aL*x3+bL;
+            if (y > min(y1, y2) && y < max(y1, y2)) return true;
+        }
+        
+        float x = (bT-bL) / (aL-aT);       
+        float y = aL*x+bL;
 
-        //interception checks
-        if (abs(x1-x2)<WW && min(x3,x4)<min(x1,x2) && max(x3,x4)>max(x1,x2) && yT>min(y1,y2) && yT<max(y1,y2)) return true;
-        if (abs(x3-x4)<WW && min(x1,x2)<min(x3,x4) && max(x1,x2)>max(x3,x4) && yL>min(y3,y4) && yL<max(y3,y4)) return true;
-        if (x-min(x1,x2)>WW && x-min(x3,x4)>WW && max(x1,x2)-x>WW && max(x3,x4)-x>WW) return true;
+        if (x > min(x1, x2) && x > min (x3, x4) && x < max(x1, x2) && x < max(x3, x4)) return true;
     }
 
     return false;
@@ -145,7 +151,7 @@ void window_setup() {
     VideoMode desktop = VideoMode::getDesktopMode();
     RenderWindow window(VideoMode(W, H, desktop.bitsPerPixel), "Polysim");
     View view(Vector2f(W/2, H/2), Vector2f(W, H));
-    window.setFramerateLimit(12);
+    window.setFramerateLimit(24);
     while(window.isOpen()){
 
         Event event;
