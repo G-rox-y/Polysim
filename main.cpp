@@ -4,23 +4,21 @@
 // to make vscode errors go away
 #include <random>
 
+
+int W= 1440, H=920;
+const float PI = 3.14159f;
+
 struct node {
     float x, y, velocity, angle;
     int type;
     // type == 1 point constrained inside the window
     // type == 0 outside window and static
 };
-struct line {
-    int p1, p2;
-    int age;
-};
 
-int W= 1440, H=920;
-const float PI = 3.14159f;
 std::vector<node> nodesData;
 std::vector<std::pair<int, int> > linesData;
 
-//check if the line defined by 2 argument points interceprs with any other lines
+
 bool intercepts_with_lines(int loc1, int loc2) {
     using namespace std;
     const float WW = 0.001f; // precision
@@ -50,7 +48,7 @@ bool intercepts_with_lines(int loc1, int loc2) {
         float aT = (y4-y3) / (x4-x3);
         float bT = y3 - aT*x3;
 
-        
+        //special case check
         if (abs(x1-x2) < WW){
             float y = aT*x1+bT;
             if (y > min(y3,y4) && y < max(y3,y4)) return true;
@@ -60,9 +58,8 @@ bool intercepts_with_lines(int loc1, int loc2) {
             if (y > min(y1, y2) && y < max(y1, y2)) return true;
         }
         
-        float x = (bT-bL) / (aL-aT);       
-        float y = aL*x+bL;
-
+        //general case check
+        float x = (bT-bL) / (aL-aT);
         if (x > min(x1, x2) && x > min (x3, x4) && x < max(x1, x2) && x < max(x3, x4)) return true;
     }
 
@@ -71,6 +68,7 @@ bool intercepts_with_lines(int loc1, int loc2) {
 
 void update_nodes_data() {
     using namespace std;
+
     //position update
     for(int i = 0; i < nodesData.size(); i++){
         if (!nodesData[i].type) continue;
@@ -97,14 +95,12 @@ void update_nodes_data() {
         }
         else nodesData[i].x += xChange;
     }
-    linesData.clear();
 
-    //connects nodes
+    //creating node connections
     struct lineSpecial {
         int p1, p2;
         float length;
     };
-
     vector<lineSpecial> v;
     for (int i = 0; i < nodesData.size(); i++){
         for (int j = i+1; j < nodesData.size(); j++){
@@ -115,10 +111,12 @@ void update_nodes_data() {
             v.emplace_back(l);
         }
     }
+
+    //filtering the node connections
+    linesData.clear();
     sort(v.begin(), v.end(), [](lineSpecial& b1, lineSpecial& b2) -> bool {
         return b1.length < b2.length;
     });
-
     for(int i = 0; i < v.size(); i++)
         if (!intercepts_with_lines(v[i].p1, v[i].p2))
             linesData.emplace_back(make_pair(v[i].p1, v[i].p2));
@@ -126,10 +124,10 @@ void update_nodes_data() {
     return;
 }
 
-// generates random nodes
 void node_spawner(int insideNodeAmmount){
     using namespace std;
 
+    //rng setup
     random_device dev;
     mt19937 rng(dev());
     uniform_real_distribution<> randomX(0.0f, (float)W);
@@ -137,6 +135,7 @@ void node_spawner(int insideNodeAmmount){
     uniform_real_distribution<> randomVel(0.2f, 0.7f);
     uniform_real_distribution<> randomAng(0.0f, 360.0f);
 
+    //generate inner nodes (type 1)
     for(int i=0; i< insideNodeAmmount; i++){
         node n;
         n.x = randomX(rng);
@@ -147,6 +146,7 @@ void node_spawner(int insideNodeAmmount){
         nodesData.emplace_back(n);
     }
 
+    //generate outer nodes (type 0)
     for(int i = 0; i <= 5; i++){
         node n1, n2, n3, n4;
 
@@ -177,16 +177,21 @@ void node_spawner(int insideNodeAmmount){
 void window_setup() {
     using namespace sf;
     
+    //window setup
     ContextSettings settings;
     settings.antialiasingLevel = 8;
     VideoMode desktop = VideoMode::getDesktopMode();
     RenderWindow window(VideoMode(W, H, desktop.bitsPerPixel), "Polysim", Style::Default, settings);
-    View view(Vector2f(W/2, H/2), Vector2f(W*2/3, H*2/3));
     window.setFramerateLimit(24);
+
+    //important wariables
+    View view(Vector2f(W/2, H/2), Vector2f(W*2/3, H*2/3));
     Font font; font.loadFromFile("OpenSans-Light.ttf");
     Clock clock;
+    
+    //window
     while(window.isOpen()){
-        
+
         Event event;
         while(window.pollEvent(event)){
             if(event.type == Event::Closed) window.close();
@@ -197,12 +202,14 @@ void window_setup() {
         window.clear();
         window.setView(view);
 
+        // //draw nodes
         // CircleShape dot(2.0f);
         // for(int i = 0; i < nodesData.size(); i++){
         //     dot.setPosition(nodesData[i].x-1, nodesData[i].y-1);
         //     window.draw(dot);
         // }
 
+        //draw lines
         for(int i = 0; i < linesData.size(); i++){
             float x1 = nodesData[linesData[i].first].x;
             float y1 = nodesData[linesData[i].first].y;
@@ -215,6 +222,7 @@ void window_setup() {
             window.draw(line, 2, Lines);
         }
 
+        //fps counter
         int time = 1.0f/clock.getElapsedTime().asSeconds();
         clock.restart();
         Text text("FPS: " + std::to_string(time), font);
@@ -234,9 +242,12 @@ int main() {
     return 0;
 }
 
+
 // todo
 // optimise algorithmical complexity
+//  - maybe update lines every so often (not with every frame)
 // error handling
 // color stuff
 // triangle detection
 // handle resizing and add some interactivity or sth
+// when 2 vertical lines are one above the other they cause a bug (fix it)
