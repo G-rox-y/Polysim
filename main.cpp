@@ -15,7 +15,7 @@ struct line {
     int age;
 };
 
-int W= 1920, H=1080;
+int W= 1440, H=920;
 const float PI = 3.14159f;
 std::vector<node> nodesData;
 std::vector<std::pair<int, int> > linesData;
@@ -115,7 +115,9 @@ void update_nodes_data() {
             v.emplace_back(l);
         }
     }
-    sort(v.begin(), v.end(), [](lineSpecial& b1, lineSpecial& b2) -> bool {return b1.length < b2.length;} );
+    sort(v.begin(), v.end(), [](lineSpecial& b1, lineSpecial& b2) -> bool {
+        return b1.length < b2.length;
+    });
 
     for(int i = 0; i < v.size(); i++)
         if (!intercepts_with_lines(v[i].p1, v[i].p2))
@@ -145,7 +147,7 @@ void node_spawner(int insideNodeAmmount){
         nodesData.emplace_back(n);
     }
 
-    for(int i = 0; i <= 10; i++){
+    for(int i = 0; i <= 5; i++){
         node n1, n2, n3, n4;
 
         n1.x = W*i/10;
@@ -169,28 +171,32 @@ void node_spawner(int insideNodeAmmount){
         nodesData.emplace_back(n4);
     }
 
-    //called so that nodes are connected from the start
-    update_nodes_data();
-
     return;
 }
 
 void window_setup() {
     using namespace sf;
-
+    
+    ContextSettings settings;
+    settings.antialiasingLevel = 8;
     VideoMode desktop = VideoMode::getDesktopMode();
-    RenderWindow window(VideoMode(W, H, desktop.bitsPerPixel), "Polysim");
+    RenderWindow window(VideoMode(W, H, desktop.bitsPerPixel), "Polysim", Style::Default, settings);
     View view(Vector2f(W/2, H/2), Vector2f(W*2/3, H*2/3));
     window.setFramerateLimit(24);
+    Font font; font.loadFromFile("OpenSans-Light.ttf");
+    Clock clock;
     while(window.isOpen()){
-
+        
         Event event;
         while(window.pollEvent(event)){
             if(event.type == Event::Closed) window.close();
         }
 
+        update_nodes_data();
+
         window.clear();
         window.setView(view);
+
         // CircleShape dot(2.0f);
         // for(int i = 0; i < nodesData.size(); i++){
         //     dot.setPosition(nodesData[i].x-1, nodesData[i].y-1);
@@ -202,17 +208,35 @@ void window_setup() {
             float y1 = nodesData[linesData[i].first].y;
             float x2 = nodesData[linesData[i].second].x;
             float y2 = nodesData[linesData[i].second].y;
-            Vertex line[] = {Vertex(Vector2f(x1, y1)), Vertex(Vector2f(x2, y2))};
+            Vertex line[] = {
+                Vertex(Vector2f(x1, y1)), 
+                Vertex(Vector2f(x2, y2))
+            };
             window.draw(line, 2, Lines);
         }
 
-        update_nodes_data();
+        int time = 1.0f/clock.getElapsedTime().asSeconds();
+        clock.restart();
+        Text text("FPS: " + std::to_string(time), font);
+        text.setFillColor(Color::White);
+        text.setCharacterSize(24);
+        text.setPosition(Vector2f(W/6, H/6));
+        window.draw(text);
+
         window.display();
+
     }
 }
 
 int main() {
-    node_spawner(150);
+    node_spawner(100);
     window_setup();
     return 0;
 }
+
+// todo
+// optimise algorithmical complexity
+// error handling
+// color stuff
+// triangle detection
+// handle resizing and add some interactivity or sth
