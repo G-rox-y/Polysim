@@ -17,7 +17,7 @@ struct node {
 
 std::vector<node> nodesData;
 std::vector<std::pair<int, int> > linesData;
-
+std::vector<std::tuple<int, int, int> > trianglesData;
 
 bool intercepts_with_lines(int loc1, int loc2) {
     using namespace std;
@@ -121,6 +121,24 @@ void update_nodes_data() {
         if (!intercepts_with_lines(v[i].p1, v[i].p2))
             linesData.emplace_back(make_pair(v[i].p1, v[i].p2));
 
+    //create triangles
+    trianglesData.clear();
+    sort(linesData.begin(), linesData.end());
+    for(int i = 0; i < linesData.size(); i++){
+        for(int j = i+1; j < linesData.size(); j++){
+            if (linesData[j].first!=linesData[i].first) break;
+            
+            int sus = 0;
+            int m = min(linesData[i].second, linesData[j].second);
+            int M = max(linesData[i].second, linesData[j].second);
+            for(int b = linesData.size()-1; b > 0; b/=2)
+                while(b+sus < linesData.size() && (linesData[b+sus].first < m || (linesData[b+sus].second <= M && linesData[b+sus].first == m)))
+                    sus += b;
+
+            if (linesData[sus].first == m && linesData[sus].second == M)
+                trianglesData.emplace_back(make_tuple(linesData[i].first, m, M));
+        }
+    }
     return;
 }
 
@@ -179,7 +197,7 @@ void window_setup() {
     
     //window setup
     ContextSettings settings;
-    settings.antialiasingLevel = 8;
+    // settings.antialiasingLevel = 8;
     VideoMode desktop = VideoMode::getDesktopMode();
     RenderWindow window(VideoMode(W, H, desktop.bitsPerPixel), "Polysim", Style::Default, settings);
     window.setFramerateLimit(24);
@@ -209,17 +227,39 @@ void window_setup() {
         //     window.draw(dot);
         // }
 
-        //draw lines
-        for(int i = 0; i < linesData.size(); i++){
-            float x1 = nodesData[linesData[i].first].x;
-            float y1 = nodesData[linesData[i].first].y;
-            float x2 = nodesData[linesData[i].second].x;
-            float y2 = nodesData[linesData[i].second].y;
-            Vertex line[] = {
-                Vertex(Vector2f(x1, y1)), 
-                Vertex(Vector2f(x2, y2))
-            };
-            window.draw(line, 2, Lines);
+        // //draw lines
+        // for(int i = 0; i < linesData.size(); i++){
+        //     float x1 = nodesData[linesData[i].first].x;
+        //     float y1 = nodesData[linesData[i].first].y;
+        //     float x2 = nodesData[linesData[i].second].x;
+        //     float y2 = nodesData[linesData[i].second].y;
+        //     Vertex line[] = {
+        //         Vertex(Vector2f(x1, y1)), 
+        //         Vertex(Vector2f(x2, y2))
+        //     };
+        //     window.draw(line, 2, Lines);
+        // }
+
+        //draw triangles
+        ConvexShape trokut;
+        trokut.setPointCount(3);
+        trokut.setOutlineThickness(1.0f);
+        trokut.setOutlineColor(Color::Red);
+        for(int i = 0; i < trianglesData.size(); i++){
+            float x1 = nodesData[std::get<0>(trianglesData[i])].x;
+            float y1 = nodesData[std::get<0>(trianglesData[i])].y;
+            trokut.setPoint(0, Vector2f(x1, y1));
+            float x2 = nodesData[std::get<1>(trianglesData[i])].x;
+            float y2 = nodesData[std::get<1>(trianglesData[i])].y;
+            trokut.setPoint(1, Vector2f(x2, y2));
+            float x3 = nodesData[std::get<2>(trianglesData[i])].x;
+            float y3 = nodesData[std::get<2>(trianglesData[i])].y;
+            trokut.setPoint(2, Vector2f(x3, y3));
+
+            int red = 60, green = 255, blue = 40;
+            float colorFactor = (y1+y2+y3)/3/H;
+            trokut.setFillColor(Color(colorFactor*red, colorFactor*green, colorFactor*blue));
+            window.draw(trokut);
         }
 
         //fps counter
@@ -247,7 +287,7 @@ int main() {
 // optimise algorithmical complexity
 //  - maybe update lines every so often (not with every frame)
 // error handling
-// color stuff
-// triangle detection
+// fix triangle bugs
+// localize linesData vector
 // handle resizing and add some interactivity or sth
 // when 2 vertical lines are one above the other they cause a bug (fix it)
