@@ -16,11 +16,11 @@ struct node {
 };
 
 std::vector<node> nodesData;
-std::vector<std::pair<int, int> > linesData;
 std::vector<std::tuple<int, int, int> > trianglesData;
 
-bool intercepts_with_lines(int loc1, int loc2) {
+bool intercepts_with_lines(int loc1, int loc2, std::vector<std::pair<int, int> >* lineAdress) {
     using namespace std;
+    vector<pair<int, int> > linesData = *lineAdress;
     const float WW = 0.001f; // precision
 
     //shortening the names just so its easier to work with
@@ -29,9 +29,9 @@ bool intercepts_with_lines(int loc1, int loc2) {
     float x2 = nodesData[loc2].x;
     float y2 = nodesData[loc2].y;
 
-    for(int i = 0; i < linesData.size(); i++){
-        int p3 = linesData[i].first;
-        int p4 = linesData[i].second;
+    for(int i = 0; i < (*lineAdress).size(); i++){
+        int p3 = (*lineAdress)[i].first;
+        int p4 = (*lineAdress)[i].second;
 
         //interception check exception
         if (loc1 == p3 || loc1 == p4 || loc2 == p3 || loc2 == p4) continue;
@@ -113,12 +113,12 @@ void update_nodes_data() {
     }
 
     //filtering the node connections
-    linesData.clear();
+    std::vector<std::pair<int, int> > linesData;
     sort(v.begin(), v.end(), [](lineSpecial& b1, lineSpecial& b2) -> bool {
         return b1.length < b2.length;
     });
     for(int i = 0; i < v.size(); i++)
-        if (!intercepts_with_lines(v[i].p1, v[i].p2))
+        if (!intercepts_with_lines(v[i].p1, v[i].p2, &linesData))
             linesData.emplace_back(make_pair(v[i].p1, v[i].p2));
 
     //create triangles
@@ -197,7 +197,7 @@ void window_setup() {
     
     //window setup
     ContextSettings settings;
-    // settings.antialiasingLevel = 8;
+    settings.antialiasingLevel = 8;
     VideoMode desktop = VideoMode::getDesktopMode();
     RenderWindow window(VideoMode(W, H, desktop.bitsPerPixel), "Polysim", Style::Default, settings);
     window.setFramerateLimit(24);
@@ -227,24 +227,9 @@ void window_setup() {
         //     window.draw(dot);
         // }
 
-        // //draw lines
-        // for(int i = 0; i < linesData.size(); i++){
-        //     float x1 = nodesData[linesData[i].first].x;
-        //     float y1 = nodesData[linesData[i].first].y;
-        //     float x2 = nodesData[linesData[i].second].x;
-        //     float y2 = nodesData[linesData[i].second].y;
-        //     Vertex line[] = {
-        //         Vertex(Vector2f(x1, y1)), 
-        //         Vertex(Vector2f(x2, y2))
-        //     };
-        //     window.draw(line, 2, Lines);
-        // }
-
         //draw triangles
         ConvexShape trokut;
         trokut.setPointCount(3);
-        trokut.setOutlineThickness(1.0f);
-        trokut.setOutlineColor(Color::Red);
         for(int i = 0; i < trianglesData.size(); i++){
             float x1 = nodesData[std::get<0>(trianglesData[i])].x;
             float y1 = nodesData[std::get<0>(trianglesData[i])].y;
@@ -287,7 +272,5 @@ int main() {
 // optimise algorithmical complexity
 //  - maybe update lines every so often (not with every frame)
 // error handling
-// fix triangle bugs
-// localize linesData vector
 // handle resizing and add some interactivity or sth
 // when 2 vertical lines are one above the other they cause a bug (fix it)
