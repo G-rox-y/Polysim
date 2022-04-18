@@ -18,9 +18,9 @@ struct node {
 std::vector<node> nodesData;
 std::vector<std::tuple<int, int, int> > trianglesData;
 
+
 bool intercepts_with_lines(int loc1, int loc2, std::vector<std::pair<int, int> >* lineAdress) {
     using namespace std;
-    vector<pair<int, int> > linesData = *lineAdress;
     const float WW = 0.001f; // precision
 
     //shortening the names just so its easier to work with
@@ -51,6 +51,7 @@ bool intercepts_with_lines(int loc1, int loc2, std::vector<std::pair<int, int> >
         //special case check
         if (abs(x1-x2) < WW){
             float y = aT*x1+bT;
+            if (abs(x3-x4) < WW && (max(min(y1, y2), min(y3, y4)) <= min(max(y1, y2), max(y3, y4)))) return true;
             if (y > min(y3,y4) && y < max(y3,y4)) return true;
         }
         if (abs(x3-x4) < WW){
@@ -111,7 +112,6 @@ void update_nodes_data() {
             v.emplace_back(l);
         }
     }
-
     //filtering the node connections
     std::vector<std::pair<int, int> > linesData;
     sort(v.begin(), v.end(), [](lineSpecial& b1, lineSpecial& b2) -> bool {
@@ -121,6 +121,13 @@ void update_nodes_data() {
         if (!intercepts_with_lines(v[i].p1, v[i].p2, &linesData))
             linesData.emplace_back(make_pair(v[i].p1, v[i].p2));
 
+    //add border lines
+    int endpt = nodesData.size();
+    while(!nodesData[endpt-1].type) endpt--;
+    linesData.emplace_back(make_pair(endpt, nodesData.size()-1));
+    for(int i = endpt+1; i < nodesData.size(); i++)
+        linesData.emplace_back(make_pair(i-1, i));
+    
     //create triangles
     trianglesData.clear();
     sort(linesData.begin(), linesData.end());
@@ -142,7 +149,7 @@ void update_nodes_data() {
     return;
 }
 
-void node_spawner(int insideNodeAmmount){
+void node_spawner(int nodeAmm){
     using namespace std;
 
     //rng setup
@@ -153,8 +160,12 @@ void node_spawner(int insideNodeAmmount){
     uniform_real_distribution<> randomVel(0.2f, 0.7f);
     uniform_real_distribution<> randomAng(0.0f, 360.0f);
 
-    //generate inner nodes (type 1)
-    for(int i=0; i< insideNodeAmmount; i++){
+    //determine node distribution
+    int outerAmm = max((W+H)/400, 1);
+    int insideAmm = nodeAmm-4*outerAmm;
+
+    // generate inner nodes (type 1)
+    for(int i=0; i< insideAmm; i++){
         node n;
         n.x = randomX(rng);
         n.y = randomY(rng);
@@ -165,28 +176,33 @@ void node_spawner(int insideNodeAmmount){
     }
 
     //generate outer nodes (type 0)
-    for(int i = 0; i <= 5; i++){
-        node n1, n2, n3, n4;
-
-        n1.x = W*i/10;
-        n1.y = -10;
-        n1.type = 0;
-        nodesData.emplace_back(n1);
-        
-        n2.x = W*i/10;
-        n2.y = H+10;
-        n2.type = 0;
-        nodesData.emplace_back(n2);
-        
-        n3.y = H*i/10;
-        n3.x = -10;
-        n3.type = 0;
-        nodesData.emplace_back(n3);
-
-        n4.y = H*i/10;
-        n4.x = W+10;
-        n4.type = 0;
-        nodesData.emplace_back(n4);
+    for(int i = 0; i < outerAmm; i++){
+        node n;
+        n.x = W*(float)i/outerAmm;
+        n.y = 0;
+        n.type = 0;
+        nodesData.emplace_back(n);
+    }
+    for(int i = 0; i < outerAmm; i++){
+        node n;
+        n.x = W;
+        n.y = H*(float)i/outerAmm;
+        n.type = 0;
+        nodesData.emplace_back(n);
+    }
+    for(int i = 0; i < outerAmm; i++){
+        node n;
+        n.x = W*(1-(float)i/outerAmm);
+        n.y = H;
+        n.type = 0;
+        nodesData.emplace_back(n);
+    }
+    for(int i = 0; i < outerAmm; i++){
+        node n;
+        n.x = 0;
+        n.y = H*(1-(float)i/outerAmm);
+        n.type = 0;
+        nodesData.emplace_back(n);
     }
 
     return;
@@ -200,13 +216,13 @@ void window_setup() {
     settings.antialiasingLevel = 8;
     VideoMode desktop = VideoMode::getDesktopMode();
     RenderWindow window(VideoMode(W, H, desktop.bitsPerPixel), "Polysim", Style::Default, settings);
-    window.setFramerateLimit(24);
+    window.setFramerateLimit(60);
 
     //important wariables
-    View view(Vector2f(W/2, H/2), Vector2f(W*2/3, H*2/3));
+    View view(Vector2f(W/2, H/2), Vector2f(W, H));
     Font font; font.loadFromFile("OpenSans-Light.ttf");
     Clock clock;
-    
+
     //window
     while(window.isOpen()){
 
@@ -216,12 +232,13 @@ void window_setup() {
         }
 
         update_nodes_data();
-
+        
         window.clear();
         window.setView(view);
 
         // //draw nodes
-        // CircleShape dot(2.0f);
+        // CircleShape dot(6.0f);
+        // dot.setFillColor(Color::Red);
         // for(int i = 0; i < nodesData.size(); i++){
         //     dot.setPosition(nodesData[i].x-1, nodesData[i].y-1);
         //     window.draw(dot);
@@ -253,7 +270,7 @@ void window_setup() {
         Text text("FPS: " + std::to_string(time), font);
         text.setFillColor(Color::White);
         text.setCharacterSize(24);
-        text.setPosition(Vector2f(W/6, H/6));
+        text.setPosition(Vector2f(5, 5));
         window.draw(text);
 
         window.display();
@@ -272,5 +289,7 @@ int main() {
 // optimise algorithmical complexity
 //  - maybe update lines every so often (not with every frame)
 // error handling
-// handle resizing and add some interactivity or sth
-// when 2 vertical lines are one above the other they cause a bug (fix it)
+// handle resizing
+// add changing colors
+// make fps counter a bit more stable
+// make node ammount changeable
