@@ -14,9 +14,13 @@ struct node {
     // type == 1 point constrained inside the window
     // type == 0 outside window and static
 };
-
 std::vector<node> nodesData;
-std::vector<std::tuple<int, int, int> > trianglesData;
+
+struct triangle {
+    int p1, p2, p3;
+    float center;
+};
+std::vector<triangle> trianglesData;
 
 
 bool intercepts_with_lines(int loc1, int loc2, std::vector<std::pair<int, int> >* lineAdress) {
@@ -142,8 +146,12 @@ void update_nodes_data() {
                 while(b+sus < linesData.size() && (linesData[b+sus].first < m || (linesData[b+sus].second <= M && linesData[b+sus].first == m)))
                     sus += b;
 
-            if (linesData[sus].first == m && linesData[sus].second == M)
-                trianglesData.emplace_back(make_tuple(linesData[i].first, m, M));
+            if (linesData[sus].first == m && linesData[sus].second == M){
+                triangle t;
+                t.p1 = linesData[i].first; t.p2 = m; t.p3 = M;
+                t.center = (nodesData[t.p1].y + nodesData[t.p2].y + nodesData[t.p3].y)/3;
+                trianglesData.emplace_back(t);
+            }
         }
     }
     return;
@@ -221,7 +229,11 @@ void window_setup() {
     //important wariables
     View view(Vector2f(W/2, H/2), Vector2f(W, H));
     Font font; font.loadFromFile("OpenSans-Light.ttf");
-    Clock clock;
+    bool nodesOn = false;
+    Clock clock, colorReductor;
+    std::vector<int> colors = {0, 255, 0};
+    std::pair<int, bool> currentColor = {1, true};
+    // ^ first value is the elemet index, and second is if its being reduced or not
 
     //window
     while(window.isOpen()){
@@ -229,39 +241,55 @@ void window_setup() {
         Event event;
         while(window.pollEvent(event)){
             if(event.type == Event::Closed) window.close();
+            if(event.type == Event::KeyReleased){
+                if (event.key.code == Keyboard::N) nodesOn = !nodesOn;
+            }
         }
 
         update_nodes_data();
-        
+
+        //update triangle colors
+        if (colorReductor.getElapsedTime().asMilliseconds() > 100){
+            colorReductor.restart();
+            if (colors[currentColor.first] == 255) currentColor.second = true;
+            else if (colors[currentColor.first] <= colors[(currentColor.first+1)%3]){
+                currentColor.first = (currentColor.first+1)%3;
+                currentColor.second = false;
+            }
+            if (currentColor.second){
+                colors[(currentColor.first+1)%3]++;
+                colors[currentColor.first]--;
+            }
+            else{
+                colors[(currentColor.first+2)%3]--;
+                colors[currentColor.first]++;
+            }
+        }
+
         window.clear();
         window.setView(view);
-
-        // //draw nodes
-        // CircleShape dot(6.0f);
-        // dot.setFillColor(Color::Red);
-        // for(int i = 0; i < nodesData.size(); i++){
-        //     dot.setPosition(nodesData[i].x-1, nodesData[i].y-1);
-        //     window.draw(dot);
-        // }
 
         //draw triangles
         ConvexShape trokut;
         trokut.setPointCount(3);
         for(int i = 0; i < trianglesData.size(); i++){
-            float x1 = nodesData[std::get<0>(trianglesData[i])].x;
-            float y1 = nodesData[std::get<0>(trianglesData[i])].y;
-            trokut.setPoint(0, Vector2f(x1, y1));
-            float x2 = nodesData[std::get<1>(trianglesData[i])].x;
-            float y2 = nodesData[std::get<1>(trianglesData[i])].y;
-            trokut.setPoint(1, Vector2f(x2, y2));
-            float x3 = nodesData[std::get<2>(trianglesData[i])].x;
-            float y3 = nodesData[std::get<2>(trianglesData[i])].y;
-            trokut.setPoint(2, Vector2f(x3, y3));
+            trokut.setPoint(0, Vector2f(nodesData[trianglesData[i].p1].x, nodesData[trianglesData[i].p1].y));
+            trokut.setPoint(1, Vector2f(nodesData[trianglesData[i].p2].x, nodesData[trianglesData[i].p2].y));
+            trokut.setPoint(2, Vector2f(nodesData[trianglesData[i].p3].x, nodesData[trianglesData[i].p3].y));
 
-            int red = 60, green = 255, blue = 40;
-            float colorFactor = (y1+y2+y3)/3/H;
-            trokut.setFillColor(Color(colorFactor*red, colorFactor*green, colorFactor*blue));
+            float colorFactor = trianglesData[i].center/H;
+            trokut.setFillColor(Color(colorFactor*colors[0], colorFactor*colors[1], colorFactor*colors[2]));
             window.draw(trokut);
+        }
+
+    	//draw nodes(this is for easier debugging)
+        if (nodesOn){
+            CircleShape dot(4.0f);
+            dot.setFillColor(Color(255-colors[0], 255-colors[1], 255-colors[2]));
+            for(int i = 0; i < nodesData.size(); i++){
+                dot.setPosition(nodesData[i].x-1, nodesData[i].y-1);
+                window.draw(dot);
+            }
         }
 
         //fps counter
@@ -274,7 +302,6 @@ void window_setup() {
         window.draw(text);
 
         window.display();
-
     }
 }
 
@@ -286,10 +313,14 @@ int main() {
 
 
 // todo
-// optimise algorithmical complexity
+// optimise algorithmical complexity and performance
 //  - maybe update lines every so often (not with every frame)
+//  - you could try implementing multithreading or async
 // error handling
 // handle resizing
-// add changing colors
 // make fps counter a bit more stable
 // make node ammount changeable
+// try to figure why sometimes triangles glitch for a splitsecond
+// left click = add node, right click = remove node
+// add pause button
+// add forces? (to reduce empty spaces)
