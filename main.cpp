@@ -71,10 +71,7 @@ bool intercepts_with_lines(int loc1, int loc2, std::vector<std::pair<int, int> >
     return false;
 }
 
-void update_nodes_data() {
-    using namespace std;
-
-    //position update
+void update_nodes_position() {
     for(int i = 0; i < nodesData.size(); i++){
         if (!nodesData[i].type) continue;
         float yChange = sin(nodesData[i].angle*2*PI/360) * nodesData[i].velocity;
@@ -100,6 +97,11 @@ void update_nodes_data() {
         }
         else nodesData[i].x += xChange;
     }
+    return;
+}
+
+void update_nodes_data() {
+    using namespace std;
 
     //creating node connections
     struct lineSpecial {
@@ -116,6 +118,7 @@ void update_nodes_data() {
             v.emplace_back(l);
         }
     }
+
     //filtering the node connections
     std::vector<std::pair<int, int> > linesData;
     sort(v.begin(), v.end(), [](lineSpecial& b1, lineSpecial& b2) -> bool {
@@ -229,7 +232,13 @@ void window_setup() {
     //important wariables
     View view(Vector2f(W/2, H/2), Vector2f(W, H));
     Font font; font.loadFromFile("OpenSans-Light.ttf");
-    bool nodesOn = false;
+    bool nodesOn = false, isPaused = false;
+
+    // fps variables
+    std::deque<int> fpsQueue;
+    int fpsQuery = 0;
+
+    //color variables
     Clock clock, colorReductor;
     std::vector<int> colors = {0, 255, 0};
     std::pair<int, bool> currentColor = {1, true};
@@ -243,26 +252,32 @@ void window_setup() {
             if(event.type == Event::Closed) window.close();
             if(event.type == Event::KeyReleased){
                 if (event.key.code == Keyboard::N) nodesOn = !nodesOn;
+                if (event.key.code == Keyboard::P) isPaused = !isPaused;
             }
         }
 
-        update_nodes_data();
+        //changes between frames
+        if (!isPaused){
+            // node changes
+            update_nodes_position();
+            update_nodes_data();
 
-        //update triangle colors
-        if (colorReductor.getElapsedTime().asMilliseconds() > 100){
-            colorReductor.restart();
-            if (colors[currentColor.first] == 255) currentColor.second = true;
-            else if (colors[currentColor.first] <= colors[(currentColor.first+1)%3]){
-                currentColor.first = (currentColor.first+1)%3;
-                currentColor.second = false;
-            }
-            if (currentColor.second){
-                colors[(currentColor.first+1)%3]++;
-                colors[currentColor.first]--;
-            }
-            else{
-                colors[(currentColor.first+2)%3]--;
-                colors[currentColor.first]++;
+            //update triangle colors
+            if (colorReductor.getElapsedTime().asMilliseconds() > 100){
+                colorReductor.restart();
+                if (colors[currentColor.first] == 255) currentColor.second = true;
+                else if (colors[currentColor.first] <= colors[(currentColor.first+1)%3]){
+                    currentColor.first = (currentColor.first+1)%3;
+                    currentColor.second = false;
+                }
+                if (currentColor.second){
+                    colors[(currentColor.first+1)%3]++;
+                    colors[currentColor.first]--;
+                }
+                else{
+                    colors[(currentColor.first+2)%3]--;
+                    colors[currentColor.first]++;
+                }
             }
         }
 
@@ -293,12 +308,23 @@ void window_setup() {
         }
 
         //fps counter
-        int time = 1.0f/clock.getElapsedTime().asSeconds();
-        clock.restart();
-        Text text("FPS: " + std::to_string(time), font);
+        Text text("", font);
         text.setFillColor(Color::White);
         text.setCharacterSize(24);
         text.setPosition(Vector2f(5, 5));
+        int time = 1.0f/clock.getElapsedTime().asSeconds();
+        clock.restart();
+        if (!isPaused){
+            fpsQueue.push_back(time);
+            fpsQuery += time;
+            if (fpsQueue.size() == 10){
+                fpsQuery -= fpsQueue.front();
+                fpsQueue.pop_front();
+                text.setString("FPS: " + std::to_string(fpsQuery/10));
+            }
+            else text.setString("FPS: ...");
+        }
+        else text.setString("Paused");
         window.draw(text);
 
         window.display();
@@ -316,11 +342,8 @@ int main() {
 // optimise algorithmical complexity and performance
 //  - maybe update lines every so often (not with every frame)
 //  - you could try implementing multithreading or async
-// error handling
-// handle resizing
-// make fps counter a bit more stable
-// make node ammount changeable
 // try to figure why sometimes triangles glitch for a splitsecond
 // left click = add node, right click = remove node
-// add pause button
 // add forces? (to reduce empty spaces)
+// update readme
+// make a slider that controls color/node speed
